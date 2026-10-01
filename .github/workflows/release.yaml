@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine next release tag
+        id: next
+        run: echo "tag=$(scripts/next-release-tag.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next.outputs.tag }}
+          generate_release_notes: true
+          make_latest: true
+
+  build:
+    needs: release
+    uses: ./.github/workflows/build.yaml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+
+  publish:
+    needs: [release, build]
+    uses: ./.github/workflows/publish.yaml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
