@@ -1,0 +1,36 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.sha.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Compute image tag
+        id: sha
+        run: echo "tag=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: meta
+    uses: ./.github/workflows/build.yaml
+    with:
+      tag: ${{ needs.meta.outputs.tag }}
+
+  publish:
+    needs: [meta, build]
+    uses: ./.github/workflows/publish.yaml
+    with:
+      tag: ${{ needs.meta.outputs.tag }}
