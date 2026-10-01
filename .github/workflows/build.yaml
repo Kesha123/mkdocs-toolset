@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag
+        required: false
+        default: dev
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: Image tag
+        required: false
+        type: string
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Determine build variables
+        id: vars
+        run: |
+          owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+
+      - name: Set up buildx builder
+        run: docker buildx create --name ci --driver docker-container --bootstrap --use
+
+      - name: Build image
+        run: |
+          make -C mkdocs build \
+            NAMESPACE=${{ steps.vars.outputs.owner }} \
+            BUILD_TAG=${{ inputs.tag }} \
+            CACHE="--cache-from type=gha --cache-to type=gha,mode=max"
+
+      - name: Smoke test
+        run: docker run --rm "ghcr.io/${{ steps.vars.outputs.owner }}/mkdocs-toolset:${{ inputs.tag }}" mkdocs --version
